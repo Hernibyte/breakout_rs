@@ -1,3 +1,5 @@
+use std::fmt::format;
+
 use macroquad::prelude::*;
 
 const PLAYER_SIZE: Vec2 = const_vec2!([150f32, 40f32]);
@@ -130,6 +132,11 @@ fn resolve_collision(a: &mut Rect, vel: &mut Vec2, b: &Rect) -> bool {
 
 #[macroquad::main("breakout")]
 async fn main() {
+    let font = load_ttf_font("res/pixel.ttf").await.unwrap();
+    let mut score = 0i32;
+
+    let mut player_lives = 3;
+
     let mut player = Player::new();
     let mut blocks = Vec::new();
     let mut balls = Vec::new();
@@ -151,6 +158,7 @@ async fn main() {
 
         // updates
         player.update(get_frame_time());
+
         for ball in balls.iter_mut() {
             ball.update(get_frame_time());
         }
@@ -161,6 +169,9 @@ async fn main() {
             for block in blocks.iter_mut() {
                 if resolve_collision(&mut ball.rect, &mut ball.vel, &block.rect){
                     block.lives -= 1;
+                    if block.lives <= 0 {
+                        score += 10;
+                    }
                 }
             }
         }
@@ -168,13 +179,31 @@ async fn main() {
         blocks.retain(|block| block.lives > 0);
 
         //draws
+
         player.draw();
         for block in blocks.iter() {
             block.draw();
         }
+
         for ball in balls.iter() {
             ball.draw();
         }
+
+        let score_text = format!("score: {}", score);
+        let score_text_dim = measure_text(&score_text, Some(font), 30u16, 1.0);
+        draw_text_ex(
+            &score_text,
+            screen_width() * 0.5f32 - score_text_dim.width * 0.5f32,
+            40.0,
+            TextParams { font, font_size: 30u16, color: BLACK, ..Default::default() }
+        );
+
+        draw_text_ex(
+            &format!("lives: {}", player_lives),
+            30.0,
+            40.0,
+            TextParams { font, font_size: 30u16, color: BLACK, ..Default::default() }
+        );
 
         next_frame().await
     }
