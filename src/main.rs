@@ -27,6 +27,13 @@ impl Player {
         };
 
         self.rect.x += x_move * dt * PLAYER_SPEED;
+
+        if self.rect.x < 0f32 {
+            self.rect.x = 0f32;
+        }
+        if self.rect.x > screen_width() - self.rect.w {
+            self.rect.x = screen_width() - self.rect.w;
+        }
     }
 
     pub fn draw(&self){
@@ -41,7 +48,7 @@ async fn main() {
     loop{
         clear_background(WHITE);
 
-        player.update(0.1f32);
+        player.update(get_frame_time());
 
         player.draw();
 
