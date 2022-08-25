@@ -58,12 +58,16 @@ impl Block {
                 BLOCK_SIZE.x, 
                 BLOCK_SIZE.y
             ),
-            lives: 1,
+            lives: 2,
         }
     }
 
     pub fn draw(&self) {
-        draw_rectangle(self.rect.x, self.rect.y, self.rect.w, self.rect.h, RED);
+        let color = match self.lives {
+            2 => RED,
+            _ => ORANGE,
+        };
+        draw_rectangle(self.rect.x, self.rect.y, self.rect.w, self.rect.h, color);
     }
 }
 
@@ -102,11 +106,26 @@ impl Ball {
 }
 
 fn resolve_collision(a: &mut Rect, vel: &mut Vec2, b: &Rect) -> bool {
-    if let Some(_intersection) = a.intersect(*b) {
-        vel.y *= -1f32;
-        return true;
+    let _intersection = match a.intersect(*b) {
+        Some(_intersection) => _intersection,
+        None => return false,
+    };
+
+    let a_center = a.point() + a.size() * 0.5f32;
+    let b_center = b.point() + b.size() * 0.5f32;
+    let to = b_center - a_center;
+    let to_signum = to.signum();
+    match _intersection.w > _intersection.h {
+        true => {
+            a.y -= to_signum.y * _intersection.h;
+            vel.y = -to_signum.y * vel.y.abs();
+        }
+        false => {
+            a.x -= to_signum.x * _intersection.w;
+            vel.x = -to_signum.x * vel.x.abs();
+        }
     }
-    return false;
+    return true;
 }
 
 #[macroquad::main("breakout")]
