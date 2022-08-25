@@ -3,6 +3,8 @@ use macroquad::prelude::*;
 const PLAYER_SIZE: Vec2 = const_vec2!([150f32, 40f32]);
 const PLAYER_SPEED: f32 = 700f32;
 const BLOCK_SIZE: Vec2 = const_vec2!([120f32, 40f32]);
+const BALL_SIZE: f32 = 50f32;
+const BALL_SPEED: f32 = 400f32;
 
 struct Player {
     rect: Rect,
@@ -63,10 +65,45 @@ impl Block {
     }
 }
 
+struct Ball {
+    rect: Rect,
+    vel: Vec2,
+}
+
+impl Ball {
+    pub fn new(pos: Vec2) -> Self {
+        Self {
+            rect: Rect::new(pos.x, pos.y, BALL_SIZE, BALL_SIZE),
+            vel: vec2(rand::gen_range(-1f32, 1f32), 1f32).normalize(),
+        }
+    }
+
+    pub fn update (&mut self, dt: f32) {
+        self.rect.x += self.vel.x * dt * BALL_SPEED;
+        self.rect.y += self.vel.y * dt * BALL_SPEED;
+
+        // limits
+        if self.rect.x < 0f32 {
+            self.vel.x = 1f32;
+        }
+        if self.rect.x > screen_width() - self.rect.w {
+            self.vel.x = -1f32;
+        }
+        if self.rect.y < 0f32 {
+            self.vel.y = 1f32;
+        }
+    }
+
+    pub fn draw(&self) {
+        draw_rectangle(self.rect.x, self.rect.y, self.rect.w, self.rect.h, GRAY);
+    }
+}
+
 #[macroquad::main("breakout")]
 async fn main() {
     let mut player = Player::new();
     let mut blocks = Vec::new();
+    let mut balls = Vec::new();
 
     let (width, height) = (6, 6);
     let padding = 5f32;
@@ -78,14 +115,22 @@ async fn main() {
         blocks.push(Block::new(board_start_pos + vec2(block_x, block_y)));
     }
 
+    balls.push(Ball::new(vec2(screen_width() * 0.5f32, screen_height() * 0.5f32)));
+
     loop{
         clear_background(WHITE);
 
         player.update(get_frame_time());
+        for ball in balls.iter_mut() {
+            ball.update(get_frame_time());
+        }
 
         player.draw();
         for block in blocks.iter() {
             block.draw();
+        }
+        for ball in balls.iter() {
+            ball.draw();
         }
 
         next_frame().await
