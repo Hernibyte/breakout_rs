@@ -62,13 +62,20 @@ impl Player {
     }
 }
 
+#[derive(PartialEq)]
+pub enum BlockType {
+    Regular,
+    SpawnBallOnDwath,
+}
+
 struct Block {
     rect: Rect,
     lives: i32,
+    block_type: BlockType
 }
 
 impl Block {
-    pub fn new(pos: Vec2) -> Self {
+    pub fn new(pos: Vec2, block_type: BlockType) -> Self {
         Self {
             rect: Rect::new(
                 pos.x, 
@@ -77,14 +84,21 @@ impl Block {
                 BLOCK_SIZE.y
             ),
             lives: 2,
+            block_type
         }
     }
 
     pub fn draw(&self) {
-        let color = match self.lives {
-            2 => RED,
-            _ => ORANGE,
+        let color = match self.block_type {
+            BlockType::Regular => {
+                match self.lives {
+                    2 => RED,
+                    _ => ORANGE,
+                }
+            },
+            BlockType::SpawnBallOnDwath => GREEN,
         };
+
         draw_rectangle(self.rect.x, self.rect.y, self.rect.w, self.rect.h, color);
     }
 }
@@ -169,7 +183,11 @@ fn init_blocks(blocks: &mut Vec<Block>) {
     for i in 0..width * height {
         let block_x = (i % width) as f32 * total_block_size.x;
         let block_y = (i / width) as f32 * total_block_size.y;
-        blocks.push(Block::new(board_start_pos + vec2(block_x, block_y)));
+        blocks.push(Block::new(board_start_pos + vec2(block_x, block_y), BlockType::Regular));
+    }
+    for _ in 0..3 {
+        let rand_index = rand::gen_range(0, blocks.len());
+        blocks[rand_index].block_type = BlockType::SpawnBallOnDwath;
     }
 }
 
@@ -189,8 +207,6 @@ async fn main() {
 
     init_blocks(&mut blocks);
 
-    balls.push(Ball::new(vec2(screen_width() * 0.5f32, screen_height() * 0.5f32)));
-
     loop{
         clear_background(WHITE);
 
@@ -199,6 +215,7 @@ async fn main() {
             GameState::Menu => {
                 if is_key_pressed(KeyCode::Space) {
                     game_state = GameState::Game;
+                    balls.push(Ball::new(vec2(screen_width() * 0.5f32, screen_height() * 0.5f32 + 20f32)));
                 }
             },
             GameState::Game => {
@@ -209,6 +226,7 @@ async fn main() {
                 }
 
                 //collisions
+                let mut spawn_later = vec![];
                 for ball in balls.iter_mut() {
                     resolve_collision(&mut ball.rect, &mut ball.vel, &player.rect);
                     for block in blocks.iter_mut() {
@@ -216,17 +234,24 @@ async fn main() {
                             block.lives -= 1;
                             if block.lives <= 0 {
                                 score += 10;
+                                if block.block_type == BlockType::SpawnBallOnDwath {
+                                    spawn_later.push(Ball::new(ball.rect.point()));
+                                }
                             }
                         }
                     }
                 }
 
+                for ball in spawn_later.into_iter() {
+                    balls.push(ball);
+                }
+
                 let balls_len = balls.len();
-                let was_last_ball = balls_len == 1;
                 balls.retain(|ball| ball.rect.y < screen_height() - 100f32);
                 let removed_balls = balls_len - balls.len();
-                if removed_balls > 0 && was_last_ball {
+                if removed_balls > 0 && balls.is_empty() {
                     player_lives -= 1;
+                    balls.push(Ball::new(player.rect.point() + vec2(player.rect.w * 0.5f32 + BALL_SIZE * 0.5f32, -50f32)));
                     if player_lives <= 0 {
                         game_state = GameState::Dead;
                     }
@@ -240,12 +265,13 @@ async fn main() {
             GameState::LevelCompleted => {
                 if is_key_pressed(KeyCode::Space){
                     game_state = GameState::Menu;
+                    reset_game(&mut score, &mut player_lives, &mut blocks, &mut balls, &mut player);
                 }
             },
             GameState::Dead => {
                 if is_key_pressed(KeyCode::Space){
                     game_state = GameState::Menu;
-                    reset_game(&mut score, &mut player_lives, &mut blocks, &mut balls, &mut player)
+                    reset_game(&mut score, &mut player_lives, &mut blocks, &mut balls, &mut player);
                 }
             },
         }
@@ -272,25 +298,37 @@ async fn main() {
                     40.0,
                     TextParams { font, font_size: 30u16, color: BLACK, ..Default::default() }
                 );
+
+                player.draw();
+                for block in blocks.iter() {
+                block.draw();
+                }
+
+                for ball in balls.iter() {
+                    ball.draw();
+                }
             },
             GameState::LevelCompleted => {
                 draw_tittle_text(&format!("You win! {} score", score), font);
+
+                draw_text_ex(
+                    "Press Space to back",
+                    30.0,
+                    40.0,
+                    TextParams { font, font_size: 30u16, color: BLACK, ..Default::default() }
+                );
             },
             GameState::Dead => {
                 draw_tittle_text(&format!("You Died! {} score", score), font);
+                
+                draw_text_ex(
+                    "Press Space to back",
+                    30.0,
+                    40.0,
+                    TextParams { font, font_size: 30u16, color: BLACK, ..Default::default() }
+                );
             },
         }
-
-        player.draw();
-        for block in blocks.iter() {
-            block.draw();
-        }
-
-        for ball in balls.iter() {
-            ball.draw();
-        }
-
-        
 
         next_frame().await
     }
